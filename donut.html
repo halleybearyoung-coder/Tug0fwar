@@ -978,6 +978,8 @@
                     }, 500);
                 }
                 
+                triggerSave();
+                
                 if (currentLevel === 15 && !playerStats.hasFreezeRay) {
                     playerStats.hasFreezeRay = true;
                     winnerText.innerText = "NEW TECH!"; winnerText.style.color = "#38bdf8";
@@ -1145,9 +1147,45 @@
             ctx.restore();
         }
 
+        function triggerSave() {
+            if (window.saveToCloud) {
+                window.saveToCloud({
+                    maxUnlockedLevel: maxUnlockedLevel,
+                    coins: coins,
+                    playerStats: playerStats
+                });
+            }
+        }
+
+        function syncUpgradeCaps() {
+            // Recalculate array sizes so saved players maintain their max cap arrays
+            while (costs.size.length <= playerStats.sizeMax) {
+                costs.size.push(costs.size[costs.size.length - 1] + 1000);
+                costs.stamina.push(costs.stamina[costs.stamina.length - 1] + 1000);
+            }
+        }
+
         function gameLoop() { update(); draw(); requestAnimationFrame(gameLoop); }
 
-        window.onload = () => { resizeCanvas(); window.addEventListener('resize', () => { if (gameState.phase !== 'waiting') resizeCanvas(); }); requestAnimationFrame(gameLoop); };
+        window.onload = () => { 
+            resizeCanvas(); 
+            window.addEventListener('resize', () => { if (gameState.phase !== 'waiting') resizeCanvas(); }); 
+            
+            if (window.initCloudSave) {
+                window.initCloudSave((savedData) => {
+                    if (savedData) {
+                        maxUnlockedLevel = savedData.maxUnlockedLevel || 1;
+                        coins = savedData.coins || 0;
+                        playerStats = { ...playerStats, ...savedData.playerStats };
+                        syncUpgradeCaps();
+                        updateCoinDisplays();
+                    }
+                    requestAnimationFrame(gameLoop);
+                });
+            } else {
+                requestAnimationFrame(gameLoop); 
+            }
+        };
     </script>
 </body>
 </html>
