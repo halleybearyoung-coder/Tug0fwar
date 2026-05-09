@@ -135,7 +135,7 @@
        <h1 class="text-7xl font-black mb-2 italic tracking-tighter text-white">PRO TUG</h1>
        <p class="text-slate-400 mb-10 text-lg tracking-wide uppercase">Team Strategy Arena</p>
       
-       <div class="flex flex-col md:flex-row gap-8">
+       <div class="flex flex-col md:flex-row flex-wrap justify-center gap-8 max-w-6xl">
            <div class="mode-card">
                <div class="text-4xl mb-4">🤝</div>
                <h2 class="text-2xl font-bold mb-2">Local PvP</h2>
@@ -153,9 +153,14 @@
                </select>
                <button onclick="showRules(document.getElementById('home-ai-difficulty').value)" class="btn w-full">Choose CPU</button>
            </div>
+           <div class="mode-card">
+               <div class="text-4xl mb-4">📈</div>
+               <h2 class="text-2xl font-bold mb-2">Campaign Map</h2>
+               <p class="text-sm text-slate-500 mb-8">Beat 5 increasingly harder AI opponents in 1v1 combat.</p>
+               <a href="donut.html" class="btn w-full block text-center mt-[44px]" style="text-decoration: none;">Play Levels</a>
+           </div>
        </div>
    </div>
-
 
    <!-- Rules Screen -->
    <div id="rules-screen">
@@ -732,6 +737,3 @@
    </script>
 </body>
 </html>
-
-
-
