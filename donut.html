@@ -83,7 +83,6 @@
     </style>
 </head>
 <body>
-
     <!-- Message Box Overlay -->
     <div id="message-box" class="fixed inset-0 bg-slate-900/90 flex items-center justify-center z-[999] hidden">
         <div class="bg-slate-800 border-2 border-slate-600 rounded-2xl p-8 max-w-md text-center shadow-2xl">
@@ -117,7 +116,7 @@
         </div>
 
         <h2 class="text-5xl font-black mt-8 mb-2 italic tracking-tight text-white shrink-0">LEVEL MAP</h2>
-        <div class="text-slate-400 mb-4 uppercase tracking-widest text-sm font-bold shrink-0">Sectors 1, 2, 3 & 4</div>
+        <div class="text-slate-400 mb-4 uppercase tracking-widest text-sm font-bold shrink-0">Sectors 1, 2, 3, 4 & 5</div>
         
         <div id="map-scroll-area">
             <div id="map-nodes" class="flex flex-col items-center justify-center relative w-full max-w-md pb-32">
@@ -221,7 +220,7 @@
                 <div id="boss-timer" class="text-3xl font-black text-red-500 drop-shadow-[0_0_10px_rgba(239,68,68,0.8)]">05:00</div>
             </div>
             <div class="px-4 py-1 bg-white/10 rounded-full mb-2 border border-white/10 shadow-lg">
-                <span class="text-[14px] font-bold uppercase tracking-widest text-yellow-400" id="level-display">Level 1 / 56</span>
+                <span class="text-[14px] font-bold uppercase tracking-widest text-yellow-400" id="level-display">Level 1 / 106</span>
             </div>
         </div>
 
@@ -243,6 +242,67 @@
             <span class="text-[10px] uppercase font-bold text-red-400 tracking-wider">Massive Yank: Shift</span>
         </div>
     </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        let app, db, auth, userId;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+        window.initCloudSave = async function(callback) {
+            try {
+                if (typeof __firebase_config === 'undefined') {
+                    console.log("Firebase config not found, running locally.");
+                    callback(null);
+                    return;
+                }
+                const firebaseConfig = JSON.parse(__firebase_config);
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+                if (token) {
+                    await signInWithCustomToken(auth, token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                
+                userId = auth.currentUser?.uid;
+                if (!userId) {
+                    callback(null);
+                    return;
+                }
+
+                // Strictly using the required path format
+                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'progress', 'savedata');
+                const docSnap = await getDoc(docRef);
+                
+                if (docSnap.exists()) {
+                    console.log("Cloud save loaded!");
+                    callback(docSnap.data());
+                } else {
+                    console.log("No existing cloud save found. Starting fresh.");
+                    callback(null);
+                }
+            } catch (error) {
+                console.error("Cloud save init error:", error);
+                callback(null);
+            }
+        };
+
+        window.saveToCloud = async function(data) {
+            if (!db || !userId) return;
+            try {
+                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'progress', 'savedata');
+                await setDoc(docRef, data, { merge: true });
+            } catch (error) {
+                console.error("Error saving to cloud:", error);
+            }
+        };
+    </script>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
@@ -530,14 +590,16 @@
             } else if (type === 'teamSpirit' && !playerStats.hasSpiritDot) {
                 if (coins >= costs.teamSpirit) { coins -= costs.teamSpirit; playerStats.hasSpiritDot = true; }
             }
-            updateCoinDisplays(); updateShopUI();
+            updateCoinDisplays(); 
+            updateShopUI();
+            triggerSave(); // FIREBASE CLOUD SAVE TRIGGER
         }
 
         function renderMap() {
             const container = document.getElementById('map-nodes');
             container.innerHTML = '';
             
-            // Dynamic snake pattern for 56 levels
+            // Dynamic snake pattern for 106 levels
             const offsets = [];
             const pattern = [0, -40, -80, -40, 0, 40, 80, 40];
             for (let i = 0; i < MAX_LEVELS; i++) {
@@ -978,7 +1040,7 @@
                     }, 500);
                 }
                 
-                triggerSave();
+                triggerSave(); // FIREBASE CLOUD SAVE TRIGGER
                 
                 if (currentLevel === 15 && !playerStats.hasFreezeRay) {
                     playerStats.hasFreezeRay = true;
@@ -989,7 +1051,7 @@
                 }
                 else if (currentLevel >= MAX_LEVELS) {
                     winnerText.innerText = "CAMPAIGN CLEARED!"; winnerText.style.color = "#22c55e";
-                    statsText.innerText = "You defeated the ACID OVERLORD and survived the gauntlet!";
+                    statsText.innerText = "You defeated the CuR53d 0V3RL0RD and survived the gauntlet!";
                     rematchBtn.style.display = "none"; 
                 } else {
                     winnerText.innerText = "VICTORY!"; winnerText.style.color = "#4ade80";
