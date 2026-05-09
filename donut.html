@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>Tug of War - Team Strategy</title>
+   <script src="https://cdn.tailwindcss.com"></script>
+   <style>
+       :root {
+           --bg-color: #0f172a;
+           --canvas-bg: linear-gradient(180deg, #1e3a8a 0%, #172554 100%);
+           --text-color: #f8fafc;
+           --control-bg: #1e293b;
+       }
+       body.light-mode {
+           --bg-color: #f1f5f9;
+           --canvas-bg: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%);
+           --text-color: #0f172a;
+           --control-bg: #e2e8f0;
+       }
+       body {
+           margin: 0;
+           overflow: hidden;
+           background-color: var(--bg-color);
+           color: var(--text-color);
+           transition: background-color 0.3s ease;
+           font-family: 'Inter', system-ui, -apple-system, sans-serif;
+           display: flex;
+           flex-direction: column;
+           align-items: center;
+           justify-content: center;
+           height: 100vh;
+           width: 100vw;
+       }
+       canvas {
+           border-radius: 16px;
+           box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+           background: var(--canvas-bg);
+           touch-action: none;
+           max-width: 95vw;
+           max-height: 60vh;
+           border: 2px solid rgba(255, 255, 255, 0.1);
+       }
+       .key-hint {
+           background: var(--control-bg);
+           padding: 4px 8px;
+           border-radius: 6px;
+           box-shadow: 0 2px 0 rgba(0,0,0,0.3);
+           font-size: 0.75rem;
+           font-weight: bold;
+       }
+       .red-text { color: #f87171; }
+       .blue-text { color: #60a5fa; }
+      
+       #victory-overlay, #home-screen, #rules-screen {
+           position: fixed;
+           inset: 0;
+           background: var(--bg-color);
+           display: flex;
+           flex-direction: column;
+           align-items: center;
+           justify-content: center;
+           z-index: 100;
+       }
+
+
+       #victory-overlay { background: rgba(15, 23, 42, 0.95); display: none; }
+       #rules-screen { display: none; }
+
+
+       .btn {
+           background: #f8fafc;
+           color: #0f172a;
+           padding: 14px 36px;
+           border-radius: 12px;
+           font-weight: 800;
+           margin: 8px;
+           transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+           cursor: pointer;
+           border: none;
+           text-transform: uppercase;
+           letter-spacing: 0.05em;
+       }
+       .btn:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3); background: #fff; }
+       .btn:active { transform: translateY(0); }
+      
+       .toggle-btn {
+           position: absolute;
+           top: 20px;
+           right: 20px;
+           padding: 10px;
+           border-radius: 12px;
+           background: var(--control-bg);
+           cursor: pointer;
+           z-index: 110;
+           border: 1px solid rgba(255,255,255,0.1);
+       }
+       .mode-card {
+           background: rgba(255,255,255,0.03);
+           padding: 32px;
+           border-radius: 24px;
+           border: 1px solid rgba(255,255,255,0.08);
+           width: 320px;
+           text-align: center;
+           backdrop-filter: blur(10px);
+       }
+       .stamina-container {
+           width: 180px;
+           height: 8px;
+           background: rgba(0,0,0,0.3);
+           border-radius: 10px;
+           overflow: hidden;
+           margin-top: 6px;
+       }
+       .stamina-bar {
+           height: 100%;
+           transition: width 0.15s ease-out;
+       }
+       .yank-cooldown {
+           font-size: 9px;
+           font-weight: 900;
+           margin-top: 2px;
+           letter-spacing: 0.05em;
+       }
+   </style>
+</head>
+<body>
+
+
+   <button class="toggle-btn" onclick="toggleMode()">🌓</button>
+
+
+   <!-- Home Screen -->
+   <div id="home-screen">
+       <h1 class="text-7xl font-black mb-2 italic tracking-tighter text-white">PRO TUG</h1>
+       <p class="text-slate-400 mb-10 text-lg tracking-wide uppercase">Team Strategy Arena</p>
+      
+       <div class="flex flex-col md:flex-row flex-wrap justify-center gap-8 max-w-6xl">
+           <div class="mode-card">
+               <div class="text-4xl mb-4">🤝</div>
+               <h2 class="text-2xl font-bold mb-2">Local PvP</h2>
+               <p class="text-sm text-slate-500 mb-8">Duel on one keyboard. Strategy over speed.</p>
+               <button onclick="showRules('none')" class="btn w-full">Choose PvP</button>
+           </div>
+           <div class="mode-card">
+               <div class="text-4xl mb-4">🤖</div>
+               <h2 class="text-2xl font-bold mb-2">CPU Battle</h2>
+               <p class="text-sm text-slate-500 mb-4">Test your timing against the AI.</p>
+               <select id="home-ai-difficulty" class="bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 mb-6 w-full outline-none text-white font-bold">
+                   <option value="easy">Beginner</option>
+                   <option value="medium" selected>Challenger</option>
+                   <option value="hard">Master</option>
+               </select>
+               <button onclick="showRules(document.getElementById('home-ai-difficulty').value)" class="btn w-full">Choose CPU</button>
+           </div>
+           <div class="mode-card">
+               <div class="text-4xl mb-4">📈</div>
+               <h2 class="text-2xl font-bold mb-2">Campaign Map</h2>
+               <p class="text-sm text-slate-500 mb-8">Beat 5 increasingly harder AI opponents in 1v1 combat.</p>
+               <a href="donut.html" class="btn w-full block text-center mt-[44px]" style="text-decoration: none;">Play Levels</a>
+           </div>
+       </div>
+   </div>
+
+   <!-- Rules Screen -->
+   <div id="rules-screen">
+       <h2 class="text-4xl font-black mb-12 italic tracking-tight">MATCH BRIEFING</h2>
+       <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl px-8 mb-16">
+           <div class="text-center p-8 bg-white/5 rounded-3xl border border-white/10">
+               <div class="text-4xl mb-4">🔋</div>
+               <h3 class="font-bold text-xl mb-3">Pooled Stamina</h3>
+               <p class="text-sm text-slate-400 leading-relaxed">Every tap costs energy. If the pool empties, your whole team locks up for recovery.</p>
+           </div>
+           <div class="text-center p-8 bg-white/5 rounded-3xl border border-white/10">
+               <div class="text-4xl mb-4">✨</div>
+               <h3 class="font-bold text-xl mb-3">Perfect Rhythm</h3>
+               <p class="text-sm text-slate-400 leading-relaxed">Wait for your player to finish their animation. Tapping in rhythm creates a 60% power boost.</p>
+           </div>
+           <div class="text-center p-8 bg-white/5 rounded-3xl border border-white/10">
+               <div class="text-4xl mb-4">⚓</div>
+               <h3 class="font-bold text-xl mb-3">Team Yank</h3>
+               <p class="text-sm text-slate-400 leading-relaxed">Massive burst of power. <b>10 second cooldown</b>. Use it wisely!</p>
+           </div>
+       </div>
+       <button onclick="startGame()" class="btn px-20 text-xl">START MATCH</button>
+   </div>
+
+
+   <!-- Victory Screen -->
+   <div id="victory-overlay">
+       <h1 id="winner-text" class="text-7xl font-black mb-4 italic">RED WINS!</h1>
+       <p id="match-stats" class="text-xl text-slate-400 mb-12 uppercase tracking-widest">Victory achieved</p>
+       <div class="flex gap-6">
+           <button onclick="showHome()" class="btn">Return Home</button>
+           <button onclick="resetMatch()" class="btn" style="background: transparent; color: white; border: 1px solid white;">Rematch</button>
+       </div>
+   </div>
+
+
+   <!-- Scoreboard & Team Stamina -->
+   <div id="game-ui" class="hidden w-full max-w-5xl flex justify-between items-center px-10 py-6 mb-6 bg-slate-900/50 rounded-3xl border border-white/5 backdrop-blur-md">
+       <div class="flex flex-col items-start gap-1">
+           <span class="text-xs font-bold uppercase tracking-widest text-red-400">Red Alliance</span>
+           <span class="text-5xl font-black" id="red-score">0</span>
+           <div class="stamina-container">
+               <div id="red-stamina-bar" class="stamina-bar bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]" style="width: 100%"></div>
+           </div>
+           <div id="red-yank-status" class="yank-cooldown text-red-400 uppercase">Yank Ready</div>
+           <span id="red-status" class="text-[10px] font-bold uppercase tracking-wider opacity-60">Status: Active</span>
+       </div>
+      
+       <div class="text-center">
+           <div class="px-4 py-1 bg-white/10 rounded-full mb-2">
+               <span class="text-[10px] font-bold uppercase tracking-tighter" id="active-difficulty-text">PvP Arena</span>
+           </div>
+           <h1 class="text-sm font-black text-slate-500 uppercase tracking-[0.3em]">First to 5</h1>
+       </div>
+
+
+       <div class="flex flex-col items-end gap-1">
+           <span class="text-xs font-bold uppercase tracking-widest text-blue-400">Blue Alliance</span>
+           <span class="text-5xl font-black" id="blue-score">0</span>
+           <div class="stamina-container">
+               <div id="blue-stamina-bar" class="stamina-bar bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]" style="width: 100%"></div>
+           </div>
+           <div id="blue-yank-status" class="yank-cooldown text-blue-400 uppercase">Yank Ready</div>
+           <span id="blue-status" class="text-[10px] font-bold uppercase tracking-wider opacity-60">Status: Active</span>
+       </div>
+   </div>
+
+
+   <canvas id="gameCanvas" class="hidden"></canvas>
+
+
+   <!-- Controls Label -->
+   <div id="controls-ui" class="hidden flex gap-16 mt-8 p-4 rounded-2xl bg-black/20">
+       <div class="flex flex-col items-center gap-2">
+           <div class="flex gap-2"><span class="key-hint">A</span><span class="key-hint">S</span><span class="key-hint">D</span><span class="key-hint">F</span></div>
+           <span class="text-[10px] uppercase font-bold text-red-400 tracking-wider">Yank: Shift</span>
+       </div>
+       <div class="flex flex-col items-center gap-2">
+           <div class="flex gap-2"><span class="key-hint">J</span><span class="key-hint">K</span><span class="key-hint">L</span><span class="key-hint">;</span></div>
+           <span class="text-[10px] uppercase font-bold text-blue-400 tracking-wider">Yank: Enter</span>
+       </div>
+   </div>
+
+
+   <script>
+       const canvas = document.getElementById('gameCanvas');
+       const ctx = canvas.getContext('2d');
+       const victoryOverlay = document.getElementById('victory-overlay');
+       const homeScreen = document.getElementById('home-screen');
+       const rulesScreen = document.getElementById('rules-screen');
+       const gameUI = document.getElementById('game-ui');
+       const controlsUI = document.getElementById('controls-ui');
+       const winnerText = document.getElementById('winner-text');
+       const redScoreEl = document.getElementById('red-score');
+       const blueScoreEl = document.getElementById('blue-score');
+
+
+       // Physics Constants
+       let WIN_THRESHOLD = 0;
+       const FRICTION = 0.94;
+       const BASE_PULL = 1.3;
+       const HEAVY_PULL = 3.2;
+       const YANK_FORCE = 15;
+       const TARGET_SCORE = 5;
+
+
+       // Strategy Constants
+       const MAX_STAMINA = 100;
+       const STAMINA_RECOVERY = 0.45;
+       const PULL_COST = 6;
+       const HEAVY_COST = 14;
+       const YANK_COST = 35;
+       const YANK_COOLDOWN_MS = 10000; // 10 second cooldown
+       const RHYTHM_WINDOW = 380;
+
+
+       let matchData = { redScore: 0, blueScore: 0, aiDifficulty: 'none' };
+       let floatingTexts = [];
+
+
+       let gameState = {
+           ropePos: 0,
+           velocity: 0,
+           gameOver: false,
+           phase: 'waiting',
+           redStamina: 100,
+           blueStamina: 100,
+           redState: 'normal',
+           blueState: 'normal',
+           redYankCooldown: 0,
+           blueYankCooldown: 0,
+           redTeam: [
+               { key: 'a', pulse: 0, offset: -160, y: -100, isHeavy: true, cooldown: 0, lastTap: 0 },
+               { key: 's', pulse: 0, offset: -110, y: -100, isHeavy: false, cooldown: 0, lastTap: 0 },
+               { key: 'd', pulse: 0, offset: -60, y: -100, isHeavy: false, cooldown: 0, lastTap: 0 },
+               { key: 'f', pulse: 0, offset: -15, y: -100, isHeavy: false, cooldown: 0, lastTap: 0 }
+           ],
+           blueTeam: [
+               { key: 'j', pulse: 0, offset: 15, y: -100, isHeavy: false, cooldown: 0, lastTap: 0 },
+               { key: 'k', pulse: 0, offset: 60, y: -100, isHeavy: false, cooldown: 0, lastTap: 0 },
+               { key: 'l', pulse: 0, offset: 110, y: -100, isHeavy: false, cooldown: 0, lastTap: 0 },
+               { key: ';', pulse: 0, offset: 160, y: -100, isHeavy: true, cooldown: 0, lastTap: 0 }
+           ]
+       };
+
+
+       function resizeCanvas() {
+           const padding = 60;
+           canvas.width = Math.min(window.innerWidth - padding, 1000);
+           canvas.height = Math.min(window.innerHeight * 0.55, 450);
+           WIN_THRESHOLD = canvas.width * 0.42;
+          
+           const spacing = canvas.width < 800 ? 35 : 45;
+           const startOffset = canvas.width < 800 ? 20 : 35;
+
+
+           gameState.redTeam.forEach((m, i) => { m.offset = -(startOffset + (3-i) * spacing); });
+           gameState.blueTeam.forEach((m, i) => { m.offset = (startOffset + i * spacing); });
+       }
+
+
+       function toggleMode() { document.body.classList.toggle('light-mode'); }
+
+
+       function showHome() {
+           homeScreen.style.display = 'flex';
+           rulesScreen.style.display = 'none';
+           victoryOverlay.style.display = 'none';
+           gameUI.classList.add('hidden');
+           canvas.classList.add('hidden');
+           controlsUI.classList.add('hidden');
+           gameState.phase = 'waiting';
+       }
+
+
+       function showRules(difficulty) {
+           matchData.aiDifficulty = difficulty;
+           homeScreen.style.display = 'none';
+           rulesScreen.style.display = 'flex';
+       }
+
+
+       function startGame() {
+           rulesScreen.style.display = 'none';
+           gameUI.classList.remove('hidden');
+           canvas.classList.remove('hidden');
+           controlsUI.classList.remove('hidden');
+           document.getElementById('active-difficulty-text').innerText = matchData.aiDifficulty === 'none' ? 'PvP Arena' : `Difficulty: ${matchData.aiDifficulty}`;
+           resizeCanvas();
+           resetMatch();
+       }
+
+
+       function resetRound() {
+           gameState.ropePos = 0;
+           gameState.velocity = 0;
+           gameState.gameOver = false;
+           gameState.phase = 'intro';
+           gameState.redStamina = 100;
+           gameState.blueStamina = 100;
+           gameState.redState = 'normal';
+           gameState.blueState = 'normal';
+           gameState.redYankCooldown = 0;
+           gameState.blueYankCooldown = 0;
+           floatingTexts = [];
+           victoryOverlay.style.display = 'none';
+           updateStaminaBars();
+
+
+           [...gameState.redTeam, ...gameState.blueTeam].forEach(m => {
+               m.y = -50 - Math.random() * 150;
+               m.cooldown = 0;
+               m.lastTap = 0;
+           });
+       }
+
+
+       function resetMatch() {
+           matchData.redScore = 0;
+           matchData.blueScore = 0;
+           updateScoreUI();
+           resetRound();
+       }
+
+
+       function updateScoreUI() {
+           redScoreEl.innerText = matchData.redScore;
+           blueScoreEl.innerText = matchData.blueScore;
+       }
+
+
+       function updateStaminaBars() {
+           document.getElementById('red-stamina-bar').style.width = `${gameState.redStamina}%`;
+           document.getElementById('blue-stamina-bar').style.width = `${gameState.blueStamina}%`;
+          
+           const rStat = document.getElementById('red-status');
+           const bStat = document.getElementById('blue-status');
+           const rYankStat = document.getElementById('red-yank-status');
+           const bYankStat = document.getElementById('blue-yank-status');
+          
+           // Status Updates
+           if (gameState.redState === 'exhausted') {
+               rStat.innerText = "STATUS: EXHAUSTED";
+               rStat.style.color = "#f87171";
+           } else {
+               rStat.innerText = "STATUS: ACTIVE";
+               rStat.style.color = "rgba(255,255,255,0.4)";
+           }
+
+
+           if (gameState.blueState === 'exhausted') {
+               bStat.innerText = "STATUS: EXHAUSTED";
+               bStat.style.color = "#60a5fa";
+           } else {
+               bStat.innerText = "STATUS: ACTIVE";
+               bStat.style.color = "rgba(255,255,255,0.4)";
+           }
+
+
+           // Yank Cooldown Updates
+           const now = Date.now();
+           if (gameState.redYankCooldown > now) {
+               const rem = Math.ceil((gameState.redYankCooldown - now) / 1000);
+               rYankStat.innerText = `Yank: ${rem}s`;
+               rYankStat.style.opacity = "0.4";
+           } else {
+               rYankStat.innerText = "Yank Ready";
+               rYankStat.style.opacity = "1";
+           }
+
+
+           if (gameState.blueYankCooldown > now) {
+               const rem = Math.ceil((gameState.blueYankCooldown - now) / 1000);
+               bYankStat.innerText = `Yank: ${rem}s`;
+               bYankStat.style.opacity = "0.4";
+           } else {
+               bYankStat.innerText = "Yank Ready";
+               bYankStat.style.opacity = "1";
+           }
+       }
+
+
+       function addFloatingText(x, y, text, color) {
+           floatingTexts.push({ x, y, text, color, life: 70 });
+       }
+
+
+       window.addEventListener('keydown', (e) => {
+           if (gameState.phase !== 'playing' || gameState.gameOver) return;
+           handlePull(e.key.toLowerCase());
+       });
+
+
+       function handlePull(key) {
+           const now = Date.now();
+           const centerX = canvas.width / 2;
+           const ropeX = centerX + gameState.ropePos;
+
+
+           // RED TEAM
+           if (key === 'shift') {
+               if (gameState.redState === 'exhausted' || gameState.redYankCooldown > now) return;
+               if (gameState.redStamina >= YANK_COST) {
+                   gameState.velocity -= YANK_FORCE;
+                   gameState.redStamina -= YANK_COST;
+                   gameState.redYankCooldown = now + YANK_COOLDOWN_MS;
+                   addFloatingText(ropeX - 80, canvas.height/2 - 60, "TEAM YANK!!", "#f87171");
+               }
+           }
+          
+           gameState.redTeam.forEach(m => {
+               if (m.key === key) {
+                   if (gameState.redState === 'exhausted' || m.cooldown > 0) return;
+                   const cost = m.isHeavy ? HEAVY_COST : PULL_COST;
+                   if (gameState.redStamina < cost) return;
+
+
+                   let strength = m.isHeavy ? HEAVY_PULL : BASE_PULL;
+                   const delta = now - m.lastTap;
+                   if (delta > 250 && delta < RHYTHM_WINDOW) {
+                       strength *= 1.6;
+                       addFloatingText(ropeX + m.offset, m.y - 45, "PERFECT", "#fbbf24");
+                   }
+
+
+                   gameState.velocity -= strength;
+                   gameState.redStamina -= cost;
+                   m.pulse = 8;
+                   m.lastTap = now;
+                   m.cooldown = m.isHeavy ? 35 : 12;
+               }
+           });
+
+
+           // BLUE TEAM
+           if (key === 'enter') {
+               if (gameState.blueState === 'exhausted' || gameState.blueYankCooldown > now) return;
+               if (gameState.blueStamina >= YANK_COST) {
+                   gameState.velocity += YANK_FORCE;
+                   gameState.blueStamina -= YANK_COST;
+                   gameState.blueYankCooldown = now + YANK_COOLDOWN_MS;
+                   addFloatingText(ropeX + 80, canvas.height/2 - 60, "TEAM YANK!!", "#60a5fa");
+               }
+           }
+
+
+           gameState.blueTeam.forEach(m => {
+               if (m.key === key) {
+                   if (gameState.blueState === 'exhausted' || m.cooldown > 0) return;
+                   const cost = m.isHeavy ? HEAVY_COST : PULL_COST;
+                   if (gameState.blueStamina < cost) return;
+
+
+                   let strength = m.isHeavy ? HEAVY_PULL : BASE_PULL;
+                   const delta = now - m.lastTap;
+                   if (delta > 250 && delta < RHYTHM_WINDOW) {
+                       strength *= 1.6;
+                       addFloatingText(ropeX + m.offset, m.y - 45, "PERFECT", "#fbbf24");
+                   }
+
+
+                   gameState.velocity += strength;
+                   gameState.blueStamina -= cost;
+                   m.pulse = 8;
+                   m.lastTap = now;
+                   m.cooldown = m.isHeavy ? 35 : 12;
+               }
+           });
+
+
+           if (gameState.redStamina <= 0) { gameState.redStamina = 0; gameState.redState = 'exhausted'; }
+           if (gameState.blueStamina <= 0) { gameState.blueStamina = 0; gameState.blueState = 'exhausted'; }
+           updateStaminaBars();
+       }
+
+
+       function runAI() {
+           const diff = matchData.aiDifficulty;
+           if (diff === 'none') return;
+           let pullChance = diff === 'easy' ? 0.015 : (diff === 'medium' ? 0.04 : 0.08);
+          
+           gameState.blueTeam.forEach(m => {
+               if (gameState.blueState !== 'exhausted' && m.cooldown <= 0) {
+                   if (Math.random() < pullChance) handlePull(m.key);
+               }
+           });
+
+
+           // AI Yank Logic
+           const now = Date.now();
+           if (gameState.blueState !== 'exhausted' && gameState.blueStamina > 60 && gameState.blueYankCooldown < now) {
+               if (gameState.ropePos < -WIN_THRESHOLD * 0.6 && Math.random() < 0.005) handlePull('enter');
+           }
+       }
+
+
+       function update() {
+           if (gameState.phase === 'waiting') return;
+           const centerY = canvas.height / 2;
+
+
+           if (gameState.phase === 'intro') {
+               let allInPlace = true;
+               [...gameState.redTeam, ...gameState.blueTeam].forEach(m => {
+                   if (m.y < centerY) { m.y += 12; allInPlace = false; } else { m.y = centerY; }
+               });
+               if (allInPlace) gameState.phase = 'playing';
+           }
+
+
+           if (gameState.phase === 'playing') {
+               runAI();
+               gameState.ropePos += gameState.velocity;
+               gameState.velocity *= FRICTION;
+
+
+               if (gameState.redState === 'exhausted') {
+                   gameState.redStamina += STAMINA_RECOVERY * 0.7;
+                   if (gameState.redStamina >= 45) gameState.redState = 'normal';
+               } else {
+                   gameState.redStamina = Math.min(MAX_STAMINA, gameState.redStamina + STAMINA_RECOVERY);
+               }
+
+
+               if (gameState.blueState === 'exhausted') {
+                   gameState.blueStamina += STAMINA_RECOVERY * 0.7;
+                   if (gameState.blueStamina >= 45) gameState.blueState = 'normal';
+               } else {
+                   gameState.blueStamina = Math.min(MAX_STAMINA, gameState.blueStamina + STAMINA_RECOVERY);
+               }
+
+
+               updateStaminaBars();
+               [...gameState.redTeam, ...gameState.blueTeam].forEach(m => {
+                   if(m.pulse > 0) m.pulse--;
+                   if(m.cooldown > 0) m.cooldown--;
+               });
+
+
+               if (gameState.ropePos < -WIN_THRESHOLD) { matchData.redScore++; startOutro("RED"); }
+               else if (gameState.ropePos > WIN_THRESHOLD) { matchData.blueScore++; startOutro("BLUE"); }
+           }
+
+
+           floatingTexts = floatingTexts.filter(t => { t.y -= 0.8; t.life--; return t.life > 0; });
+           if (gameState.phase === 'outro') {
+               [...gameState.redTeam, ...gameState.blueTeam].forEach(m => { m.y += 20; });
+               if (gameState.redTeam[0].y > canvas.height + 150) { checkMatchEnd(); }
+           }
+       }
+
+
+       function startOutro(winner) {
+           gameState.phase = 'outro';
+           gameState.lastWinner = winner;
+           updateScoreUI();
+       }
+
+
+       function checkMatchEnd() {
+           if (matchData.redScore >= TARGET_SCORE || matchData.blueScore >= TARGET_SCORE) {
+               gameState.gameOver = true;
+               victoryOverlay.style.display = 'flex';
+               winnerText.innerText = `${gameState.lastWinner} WINS MATCH!`;
+               winnerText.style.color = gameState.lastWinner === "RED" ? "#f87171" : "#60a5fa";
+           } else { resetRound(); }
+       }
+
+
+       function draw() {
+           if (gameState.phase === 'waiting') return;
+           const centerX = canvas.width / 2;
+           const centerY = canvas.height / 2;
+           const ropeX = centerX + gameState.ropePos;
+
+
+           // Background Pattern
+           ctx.clearRect(0, 0, canvas.width, canvas.height);
+           ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+           ctx.lineWidth = 1;
+           for(let i=0; i<canvas.width; i+=40) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke(); }
+           for(let j=0; j<canvas.height; j+=40) { ctx.beginPath(); ctx.moveTo(0, j); ctx.lineTo(canvas.width, j); ctx.stroke(); }
+
+
+           // Win Zones
+           ctx.fillStyle = 'rgba(255,255,255,0.03)';
+           ctx.fillRect(0, 0, centerX - WIN_THRESHOLD, canvas.height);
+           ctx.fillRect(centerX + WIN_THRESHOLD, 0, centerX - WIN_THRESHOLD, canvas.height);
+
+
+           // Rope Shadows
+           ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+           ctx.lineWidth = 12;
+           ctx.beginPath(); ctx.moveTo(0, centerY + 4); ctx.lineTo(canvas.width, centerY + 4); ctx.stroke();
+
+
+           // Rope
+           ctx.strokeStyle = '#e2ba8d';
+           ctx.lineWidth = 8;
+           ctx.beginPath(); ctx.moveTo(0, centerY); ctx.lineTo(canvas.width, centerY); ctx.stroke();
+
+
+           // Center Flag
+           ctx.fillStyle = '#fff';
+           ctx.shadowBlur = 15;
+           ctx.shadowColor = 'white';
+           ctx.fillRect(ropeX - 3, centerY - 35, 6, 70);
+           ctx.shadowBlur = 0;
+
+
+           // Floating Texts
+           floatingTexts.forEach(t => {
+               ctx.globalAlpha = t.life / 70;
+               ctx.fillStyle = t.color;
+               ctx.font = "bold 12px 'Inter'";
+               ctx.textAlign = "center";
+               ctx.fillText(t.text.toUpperCase(), t.x, t.y);
+               ctx.globalAlpha = 1.0;
+           });
+
+
+           // Players
+           [...gameState.redTeam, ...gameState.blueTeam].forEach((m, idx) => {
+               const isRed = idx < 4;
+               const size = m.isHeavy ? 14 : 10;
+               const color = isRed ? '#f87171' : '#60a5fa';
+               const teamState = isRed ? gameState.redState : gameState.blueState;
+               const x = ropeX + m.offset;
+
+
+               ctx.save();
+               ctx.translate(x, m.y);
+              
+               if (teamState === 'exhausted') ctx.globalAlpha = 0.2;
+               else if (m.cooldown > 0) ctx.globalAlpha = 0.5;
+
+
+               // Glow for Pulse
+               if (m.pulse > 0) {
+                   ctx.shadowBlur = 10;
+                   ctx.shadowColor = color;
+                   ctx.fillStyle = '#fff';
+               } else {
+                   ctx.fillStyle = color;
+               }
+
+
+               ctx.beginPath();
+               ctx.arc(0, 0, size + (m.pulse > 0 ? 4 : 0), 0, Math.PI * 2);
+               ctx.fill();
+
+
+               // Simple Face for Detail
+               ctx.fillStyle = 'rgba(0,0,0,0.3)';
+               ctx.beginPath(); ctx.arc(-size/3, -size/5, 1.5, 0, Math.PI*2); ctx.fill();
+               ctx.beginPath(); ctx.arc(size/3, -size/5, 1.5, 0, Math.PI*2); ctx.fill();
+
+
+               ctx.restore();
+           });
+       }
+
+
+       function gameLoop() {
+           update(); draw(); requestAnimationFrame(gameLoop);
+       }
+
+
+       window.onload = () => {
+           resizeCanvas();
+           window.addEventListener('resize', () => { if (gameState.phase !== 'waiting') resizeCanvas(); });
+           requestAnimationFrame(gameLoop);
+       };
+   </script>
+</body>
+</html>
